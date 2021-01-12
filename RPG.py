@@ -7,13 +7,22 @@ import time
 from tkinter import filedialog
 from tkinter import *
 import logging
+import traceback
 
 #Start pygame
 pygame.init()
 
 #logging config
-logging.basicConfig(filename="log.txt", level=logging.DEBUG,filemode="w",format="%(asctime)s:%(levelname)s:%(message)s",datefmt="%d/%m/%Y %I:%M:%S %p")
+logging.basicConfig(filename="log.txt", level=logging.DEBUG,filemode="w",format="%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",datefmt="%d/%m/%Y %I:%M:%S %p")
+SYS_EXCEPT_HOOK = sys.excepthook
 
+#so it shows the line in the log if it crashes
+def _excepthook(typ, value, trace):
+    """ override builtin excepthook """
+    logging.error("{}\n{}\n{}".format(typ.__name__, value, ''.join(traceback.format_tb(trace))))
+    SYS_EXCEPT_HOOK(typ, value, trace)
+
+sys.excepthook = _excepthook
 #Declaring Variables that will be used throught the game
 vec = pygame.math.Vector2
 HEIGHT = 350
@@ -227,8 +236,10 @@ class Enemy(pygame.sprite.Sprite):
          self.rect = self.image.get_rect()
          self.pos = vec(0,0)
          self.vel = vec(0,0)
+         
          self.direction = random.randint(0,1) #0 for right, 1 is left
          self.vel.x = random.randint(2,6) /2  #Randomised velocity of the generated enemy
+         
          #Sets the intial position of the enemy
          if self.direction == 0:
              self.pos.x = 0
@@ -236,31 +247,37 @@ class Enemy(pygame.sprite.Sprite):
          if self.direction == 1:
              self.pos.x = 700
              self.pos.y = 235
+     
      def move(self):
          #Causes the enemy to change directions upon reaching the end of the screen
          if self.pos.x >= (WIDTH-20):
              self.direction = 1
          elif self.pos.x <= 0:
              self.direction = 0
+         
          #Updates postion with new values
          if self.direction == 0:
              self.pos.x += self.vel.x
          elif self.direction == 1:
              self.pos.x -= self.vel.x
+         
          #updates rect
          self.rect.center = self.pos
+     
      def render(self):
          #Display the enemy on screen
          displaysurface.blit(self.image, (self.pos.x, self.pos.y))
+     
      def update(self):
          #Checks for collision with the Player
          hits = pygame.sprite.spritecollide(self, Playergroup, False)
+     
          #Activates when the two expressions are true
          if hits and player.attacking == True:
              self.kill()
              player.score += 1
              print("Enemy killed")
-         #if collision has occured and player not attacking, call "hit" function
+          #if collision has occured and player not attacking, call "hit" function
          elif hits and player.attacking == False:
              player.player_hit()
 
@@ -278,10 +295,11 @@ class EventHandler():
          self.enemy_count = 0
          self.battle = False
          self.enemy_generation =  pygame.USEREVENT + 1
-         self.stage_enemies= []
          self.stage = 1
+         self.stage_enemies= []
          for x in range(1,21):
              self.stage_enemies.append(int((x ** 2/2) + 1))
+    
      def stage_handler(self):
          #code for the tkinter stage selection window
          self.root = Tk()
@@ -296,6 +314,7 @@ class EventHandler():
          button3.place(x = 40, y = 115)
          
          self.root.mainloop()
+     
      def world1(self):
          self.root.destroy()
          pygame.time.set_timer(self.enemy_generation, 2000)
@@ -310,8 +329,8 @@ class EventHandler():
      
      def next_stage(self): #Code for then the next stage is clicked
          self.stage += 1
-         self.enemy_count = 0
          print("Stage: " + str(self.stage))
+         self.enemy_count = 0
          pygame.time.set_timer(self.enemy_generation, 1500 - (50 * self.stage))
     
 class HealthBar(pygame.sprite.Sprite):
